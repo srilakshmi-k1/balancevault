@@ -1,0 +1,138 @@
+import React, { useState, useEffect } from 'react';
+import { adminApi } from '../services/api';
+import PageLayout from '../components/PageLayout';
+import Card from '../components/Card';
+import StatusBadge from '../components/StatusBadge';
+import Button from '../components/Button';
+import Alert from '../components/Alert';
+import Pagination from '../components/Pagination';
+
+export default function AdminOnboarding() {
+  const [records, setRecords] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [reviewing, setReviewing] = useState(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [alert, setAlert] = useState(null);
+
+  const load = (p = 1) => {
+    setLoading(true);
+    adminApi.getOnboardings({ page: p, limit: 15, status: filterStatus || undefined })
+      .then((res) => {
+        setRecords(res.data.data || []);
+        setPagination(res.data.pagination || {});
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(page); }, [page, filterStatus]);
+
+  const handleReview = async (status) => {
+    setActionLoading(true);
+    try {
+      await adminApi.reviewOnboarding(reviewing.id, { status, reviewNote });
+      setAlert({ type: 'success', message: `Onboarding ${status.toLowerCase()} successfully` });
+      setReviewing(null);
+      setReviewNote('');
+      load(page);
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.message || 'Action failed' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <PageLayout>
+      <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--navy)' }}>Onboarding Management</h1>
+      <p style={{ color: 'var(--grey-400)', marginBottom: '2rem' }}>Review and approve account applications</p>
+
+      {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      {/* Review Modal */}
+      {reviewing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', padding: '2rem', width: '100%', maxWidth: 500, boxShadow: 'var(--shadow-lg)' }}>
+            <h2 style={{ fontWeight: 700, marginBottom: '1rem' }}>Review Application</h2>
+            <p><strong>Applicant:</strong> {reviewing.user?.firstName} {reviewing.user?.lastName}</p>
+            <p><strong>Email:</strong> {reviewing.user?.email}</p>
+            <p><strong>Occupation:</strong> {reviewing.occupation}</p>
+            <p><strong>ID Type:</strong> {reviewing.idType}</p>
+            <p style={{ marginBottom: '1rem' }}><strong>Submitted:</strong> {new Date(reviewing.submittedAt).toLocaleDateString()}</p>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.4rem', fontSize: '0.9rem', color: 'var(--grey-700)' }}>Review Note (optional)</label>
+              <textarea
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                rows={3}
+                style={{ width: '100%', padding: '10px', border: '1px solid var(--grey-300)', borderRadius: 'var(--radius)', fontSize: '0.9rem', resize: 'vertical' }}
+                placeholder="Add a note for the applicant..."
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <Button variant="success" loading={actionLoading} onClick={() => handleReview('APPROVED')}>✓ Approve</Button>
+              <Button variant="danger" loading={actionLoading} onClick={() => handleReview('REJECTED')}>✗ Reject</Button>
+              <Button variant="ghost" onClick={() => { setReviewing(null); setReviewNote(''); }}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontWeight: 600, color: 'var(--grey-700)' }}>Filter:</span>
+          {['', 'PENDING', 'APPROVED', 'REJECTED'].map((s) => (
+            <button key={s} onClick={() => { setFilterStatus(s); setPage(1); }}
+              style={{ padding: '5px 14px', borderRadius: '999px', border: '1px solid', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
+                background: filterStatus === s ? 'var(--navy)' : 'transparent',
+                color: filterStatus === s ? 'white' : 'var(--grey-600)',
+                borderColor: filterStatus === s ? 'var(--navy)' : 'var(--grey-300)',
+              }}>
+              {s || 'All'}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ width: 36, height: 36 }} /></div>
+        ) : records.length === 0 ? (
+          <p style={{ textAlign: 'center', color: 'var(--grey-400)', padding: '3rem 0' }}>No records found</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--grey-200)' }}>
+                  {['Applicant', 'Email', 'Occupation', 'Status', 'Submitted', 'Actions'].map((h) => (
+                    <th key={h} style={{ textAlign: 'left', padding: '0.75rem 1rem', color: 'var(--grey-400)', fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r) => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--grey-100)' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{r.user?.firstName} {r.user?.lastName}</td>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--grey-600)' }}>{r.user?.email}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>{r.occupation}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}><StatusBadge status={r.status} /></td>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--grey-400)', fontSize: '0.85rem' }}>{new Date(r.submittedAt).toLocaleDateString()}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      {r.status === 'PENDING' && (
+                        <Button variant="secondary" onClick={() => setReviewing(r)} style={{ padding: '5px 14px', fontSize: '0.8rem' }}>
+                          Review
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <Pagination page={page} totalPages={pagination.totalPages} onPage={setPage} />
+      </Card>
+    </PageLayout>
+  );
+}
