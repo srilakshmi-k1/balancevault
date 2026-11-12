@@ -3,7 +3,8 @@
  * Run: node prisma/seed.js
  * Or via npm script: npm run db:seed
  *
- * Set ADMIN_EMAIL / ADMIN_PASSWORD env vars, or defaults are used.
+ * Production requires ADMIN_EMAIL / ADMIN_PASSWORD environment variables.
+ * Development falls back to local-only defaults when they are omitted.
  */
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
@@ -13,6 +14,10 @@ const prisma = new PrismaClient();
 async function main() {
   const email = process.env.ADMIN_EMAIL || 'admin@balancevault.com';
   const password = process.env.ADMIN_PASSWORD || 'Admin@123456';
+
+  if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)) {
+    throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must be set before seeding in production.');
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -45,7 +50,6 @@ async function main() {
   });
 
   console.log(`✅ Admin user created: ${email}`);
-  console.log(`   Password: ${password}`);
   console.log('   Please change the password after first login.');
 }
 

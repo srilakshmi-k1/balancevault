@@ -1,12 +1,11 @@
 services:
-  # Backend API Web Service
   - type: web
     name: balancevault-backend
     runtime: node
     plan: free
     region: oregon
     rootDir: backend
-    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy && node prisma/seed.js
+    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -23,29 +22,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 24h
       - key: ALLOWED_ORIGINS
-        value: '*'
-      - key: ADMIN_EMAIL
-        value: admin@balancevault.com
-      - key: ADMIN_PASSWORD
-        value: Admin@123456
-
-  # Frontend Static Site
-  - type: web
-    name: balancevault-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: balancevault-backend
-          property: host
+        sync: false
 
 databases:
   - name: balancevault-db
